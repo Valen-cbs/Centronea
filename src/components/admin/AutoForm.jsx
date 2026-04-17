@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import Dropzone from './Dropzone.jsx';
+import ImageManager from './ImageManager.jsx';
+import { updateImagesOrder } from '../../lib/carImages.js';
 
 const initialValues = {
   marca: '',
@@ -10,6 +11,30 @@ const initialValues = {
   descripcion: '',
   estado: 'Usado',
 };
+
+function normalizeExistingPhoto(photo, index) {
+  if (typeof photo === 'string') {
+    return {
+      id: `legacy-photo-${index}`,
+      url: photo,
+      databaseId: null,
+    };
+  }
+
+  return {
+    ...photo,
+    id: photo.id ?? `photo-${index}`,
+    url: photo.url ?? '',
+    databaseId: photo.id ?? null,
+  };
+}
+
+function normalizeExistingPhotos(photos = []) {
+  return [...photos]
+    .sort((firstPhoto, secondPhoto) => (firstPhoto?.orden ?? 0) - (secondPhoto?.orden ?? 0))
+    .map((photo, index) => normalizeExistingPhoto(photo, index))
+    .filter((photo) => photo.url);
+}
 
 export default function AutoForm({ currentAuto, onCancel, onSubmit, saving }) {
   const [values, setValues] = useState(initialValues);
@@ -38,7 +63,7 @@ export default function AutoForm({ currentAuto, onCancel, onSubmit, saving }) {
       descripcion: currentAuto.descripcion ?? '',
       estado: currentAuto.estado ?? 'Usado',
     });
-    setExistingPhotos(currentAuto.fotos ?? []);
+    setExistingPhotos(normalizeExistingPhotos(currentAuto.fotos));
     setRemovedPhotos([]);
     setNewFiles([]);
   }, [currentAuto]);
@@ -81,9 +106,33 @@ export default function AutoForm({ currentAuto, onCancel, onSubmit, saving }) {
     });
   };
 
-  const handleRemoveExistingPhoto = (photo) => {
-    setExistingPhotos((previous) => previous.filter((item) => item !== photo));
-    setRemovedPhotos((previous) => [...previous, photo]);
+  const handleRemoveExistingPhoto = (photoToRemove) => {
+    setExistingPhotos((previous) => previous.filter((photo) => photo.id !== photoToRemove.id));
+
+    if (photoToRemove.url) {
+      setRemovedPhotos((previous) => [...previous, photoToRemove.url]);
+    }
+  };
+
+  const handleReorderExistingPhotos = async (nextPhotos) => {
+    setExistingPhotos(nextPhotos);
+
+    const sortablePhotos = nextPhotos
+      .filter((photo) => photo.databaseId)
+      .map((photo) => ({ ...photo, id: photo.databaseId }));
+
+    if (!sortablePhotos.length) {
+      return;
+    }
+
+    try {
+      await updateImagesOrder(sortablePhotos);
+    } catch (error) {
+      console.error('No se pudo sincronizar el orden de las fotos existentes:', error);
+      setFormError(
+        'El orden se actualizó visualmente, pero no se pudo sincronizar con Supabase.',
+      );
+    }
   };
 
   const resetForm = () => {
@@ -140,7 +189,7 @@ export default function AutoForm({ currentAuto, onCancel, onSubmit, saving }) {
           precio: precioUSD,
           precio_ars: precioARS,
         },
-        existingPhotos,
+        existingPhotos: existingPhotos.map((photo) => photo.url),
         removedPhotos,
         newFiles,
       });
@@ -260,12 +309,13 @@ export default function AutoForm({ currentAuto, onCancel, onSubmit, saving }) {
           </div>
         </div>
 
-        <Dropzone
+        <ImageManager
           newFiles={newFiles}
           onFilesSelected={handleFilesSelected}
           onRemoveNewFile={handleRemoveNewFile}
           existingPhotos={existingPhotos}
           onRemoveExistingPhoto={handleRemoveExistingPhoto}
+          onReorderExistingPhotos={handleReorderExistingPhotos}
         />
 
         {formError && (
