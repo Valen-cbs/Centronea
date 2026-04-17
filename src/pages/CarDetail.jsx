@@ -113,7 +113,7 @@ export default function CarDetail() {
     <div className="section-shell space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link
-          to="/#catalogo"
+          to="/"
           className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 transition hover:text-brand-900"
         >
           <ArrowLeft className="h-4 w-4" />
