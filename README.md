@@ -1,4 +1,4 @@
-# Centronea v2
+# Centronea
 
 Frontend web app for managing and publishing a car catalog. The project includes a public storefront for browsing vehicles and a protected admin panel for creating, editing, and deleting listings with image uploads to Supabase Storage.
 
